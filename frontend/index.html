@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background-color: #f0f2f5;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 400px;
+            height: 600px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            padding: 20px;
+            background: #0084ff;
+            color: white;
+            border-radius: 12px 12px 0 0;
+            text-align: center;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message.user {
+            align-items: flex-end;
+        }
+
+        .message.bot {
+            align-items: flex-start;
+        }
+
+        .message-content {
+            max-width: 80%;
+            padding: 10px 15px;
+            border-radius: 15px;
+            margin: 5px 0;
+        }
+
+        .user .message-content {
+            background: #0084ff;
+            color: white;
+        }
+
+        .bot .message-content {
+            background: #e9ecef;
+            color: black;
+        }
+
+        .chat-input {
+            padding: 20px;
+            border-top: 1px solid #dee2e6;
+            display: flex;
+            gap: 10px;
+        }
+
+        #message-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 20px;
+            outline: none;
+        }
+
+        #send-button {
+            padding: 10px 20px;
+            background: #0084ff;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        #send-button:hover {
+            background: #0073e6;
+        }
+
+        .typing-indicator {
+            display: none;
+            padding: 10px 15px;
+            background: #e9ecef;
+            border-radius: 15px;
+            margin: 5px 0;
+            color: #666;
+        }
+
+        .typing-indicator.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h2>Chatbot</h2>
+        </div>
+        <div class="chat-messages" id="chat-messages">
+            <div class="message bot">
+                <div class="message-content">
+                    Xin chào! Tôi có thể giúp gì cho bạn?
+                </div>
+            </div>
+        </div>
+        <div class="typing-indicator" id="typing-indicator">
+            Đang nhập tin nhắn...
+        </div>
+        <div class="chat-input">
+            <input type="text" id="message-input" placeholder="Nhập tin nhắn của bạn...">
+            <button id="send-button">Gửi</button>
+        </div>
+    </div>
+
+    <script>
+        const chatMessages = document.getElementById('chat-messages');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const typingIndicator = document.getElementById('typing-indicator');
+
+        function addMessage(content, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+            messageDiv.innerHTML = `
+                <div class="message-content">
+                    ${content}
+                </div>
+            `;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            // Add user message
+            addMessage(message, true);
+            messageInput.value = '';
+
+            // Show typing indicator
+            typingIndicator.classList.add('active');
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message }),
+                });
+
+                const data = await response.json();
+
+                // Hide typing indicator
+                typingIndicator.classList.remove('active');
+
+                // Add bot response
+                addMessage(data.reply);
+
+                // If there's a voice URL, play it
+                if (data.voice_url) {
+                    const audio = new Audio(data.voice_url);
+                    audio.play();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                typingIndicator.classList.remove('active');
+                addMessage('Xin lỗi, có lỗi xảy ra. Vui lòng thử lại sau.');
+            }
+        }
+
+        // Event listeners
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Focus input on load
+        messageInput.focus();
+    </script>
+</body>
+</html>
