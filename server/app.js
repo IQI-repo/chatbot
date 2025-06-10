@@ -3,6 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const bodyParser = require('body-parser');
 const path = require('path');
+const { testConnection } = require('./utils/db');
 
 dotenv.config();
 
@@ -17,6 +18,7 @@ app.use(express.static(path.join(__dirname, '../frontend')));
 app.use('/data', express.static(path.join(__dirname, '../data')));
 
 app.use('/api/chat', require('./routes/chat'));
+app.use('/api/chat-mysql', require('./routes/chatMySql'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/menu', require('./routes/menu'));
 app.use('/api/fb', require('./routes/fb'));
@@ -25,4 +27,8 @@ app.use('/api/zalo-personal', require('./routes/zalo_personal'));
 
 app.use((req, res) => res.status(404).send({error: "Not found"}));
 
-app.listen(PORT, () => console.log(`Bot backend running at http://localhost:${PORT}`));
+app.listen(PORT, async () => {
+  console.log(`Bot backend running at http://localhost:${PORT}`);
+  // Test MySQL database connection
+  await testConnection();
+});

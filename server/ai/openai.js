@@ -4,7 +4,8 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_KEY,
 });
 
-exports.chatWithOpenAI = async (message) => {
+// Export as a named function to ensure it's properly recognized
+const chatWithOpenAI = async (message) => {
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
@@ -18,4 +19,9 @@ exports.chatWithOpenAI = async (message) => {
     console.error('OpenAI error:', err.message);
     return "Xin lỗi, tôi đang bị quá tải hoặc khóa API. Vui lòng thử lại sau!";
   }
+};
+
+// Export the function
+module.exports = {
+  chatWithOpenAI
 };

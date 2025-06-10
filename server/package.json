@@ -1,20 +1,21 @@
 {
-    "name": "bo_ship_bot",
-    "version": "1.0.0",
-    "main": "app.js",
-    "license": "MIT",
-    "scripts": {
-      "start": "node app.js"
-    },
-    "dependencies": {
-      "express": "^4.18.2",
-      "dotenv": "^16.3.1",
-      "axios": "^1.6.2",
-      "body-parser": "^1.20.2",
-      "cors": "^2.8.5",
-      "mongoose": "^8.0.3",
-      "@google-cloud/vision": "^4.0.1",
-      "@google-cloud/text-to-speech": "^5.0.0",
-      "openai": "^4.24.1"
-    }
+  "name": "bo_ship_bot",
+  "version": "1.0.0",
+  "main": "app.js",
+  "license": "MIT",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "@google-cloud/text-to-speech": "^5.0.0",
+    "@google-cloud/vision": "^4.0.1",
+    "axios": "^1.6.2",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "mongoose": "^8.0.3",
+    "mysql2": "^3.14.1",
+    "openai": "^4.24.1"
+  }
 }
