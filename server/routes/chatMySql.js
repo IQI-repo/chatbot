@@ -6,6 +6,7 @@ const chatMySqlController = require('../controllers/chatMySqlController');
 router.get('/sessions/user/:user_id', chatMySqlController.getUserChatSessions);
 router.post('/sessions', chatMySqlController.createChatSession);
 router.put('/sessions/:session_id/end', chatMySqlController.endChatSession);
+router.delete('/sessions/:session_id', chatMySqlController.deleteChatSession);
 
 // Chat messages routes
 router.get('/messages/:session_id', chatMySqlController.getChatMessages);

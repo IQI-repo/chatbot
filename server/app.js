@@ -17,6 +17,11 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '15mb' }));
 app.use(express.static(path.join(__dirname, '../frontend')));
 app.use('/data', express.static(path.join(__dirname, '../data')));
 
+// Handle chat routes for client-side routing
+app.get('/chat/:id', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/index.html'));
+});
+
 app.use('/api/chat', require('./routes/chat'));
 app.use('/api/chat-mysql', require('./routes/chatMySql'));
 app.use('/api/admin', require('./routes/admin'));

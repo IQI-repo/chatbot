@@ -3,12 +3,14 @@
  * Displays and manages chat sessions
  */
 import chatService from '../services/chatService.js';
+import ModalComponent from './ModalComponent.js';
 
 export default class SessionComponent {
   constructor(appContainer, onSessionSelect) {
     this.appContainer = appContainer;
     this.onSessionSelect = onSessionSelect;
     this.sessions = [];
+    this.modal = new ModalComponent();
     this.render();
     this.loadSessions();
   }
@@ -22,10 +24,14 @@ export default class SessionComponent {
         <div class="session-header">
           <div class="session-title">Lịch sử chat</div>
           <button class="new-chat-button" id="new-chat-button">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
             Chat mới
           </button>
         </div>
-        <div id="sessions-container">
+        <div id="sessions-container" class="sessions-container">
           <div class="loading-sessions">Đang tải...</div>
         </div>
       </div>
@@ -40,11 +46,13 @@ export default class SessionComponent {
 
   /**
    * Load user sessions
+   * @returns {Promise<Array>} - Promise that resolves to the sessions array
    */
   async loadSessions() {
     try {
       this.sessions = await chatService.getUserSessions();
       this.renderSessions();
+      return this.sessions;
     } catch (error) {
       console.error('Error loading sessions:', error);
       this.sessionsContainer.innerHTML = `
@@ -52,6 +60,7 @@ export default class SessionComponent {
           Không thể tải lịch sử chat. Vui lòng thử lại sau.
         </div>
       `;
+      return [];
     }
   }
 
@@ -87,6 +96,16 @@ export default class SessionComponent {
           <div class="session-preview">
             ${session.context || 'Cuộc trò chuyện mới'}
           </div>
+          <div class="session-actions">
+            <button class="delete-session-btn" data-id="${session.id}">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18"></path>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+              </svg>
+            </button>
+          </div>
         </div>
       `;
     }).join('');
@@ -94,18 +113,74 @@ export default class SessionComponent {
     // Add click event listeners to session items
     const sessionItems = this.sessionsContainer.querySelectorAll('.session-item');
     sessionItems.forEach(item => {
-      item.addEventListener('click', () => {
+      // Prevent click event on delete button from triggering session selection
+      const deleteBtn = item.querySelector('.delete-session-btn');
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent event bubbling
+        const sessionId = parseInt(deleteBtn.dataset.id);
+        this.confirmDeleteSession(sessionId);
+      });
+      
+      // Session selection click event
+      item.addEventListener('click', (e) => {
+        // Don't select session if clicking on delete button
+        if (e.target.closest('.delete-session-btn')) {
+          return;
+        }
+        
         const sessionId = parseInt(item.dataset.id);
         const session = this.sessions.find(s => s.id === sessionId);
         
         if (session) {
           chatService.setCurrentSession(session);
+          // Update URL to include session ID
+          history.pushState({sessionId}, '', `/chat/${sessionId}`);
           if (this.onSessionSelect) {
             this.onSessionSelect(session);
           }
         }
       });
     });
+  }
+  
+  /**
+   * Show confirmation modal before deleting a session
+   * @param {number} sessionId - ID of the session to delete
+   */
+  confirmDeleteSession(sessionId) {
+    this.modal.show(
+      'Xóa cuộc trò chuyện', 
+      'Bạn có chắc chắn muốn xóa cuộc trò chuyện này? Hành động này không thể hoàn tác.',
+      () => this.deleteSession(sessionId)
+    );
+  }
+  
+  /**
+   * Delete a chat session
+   * @param {number} sessionId - ID of the session to delete
+   */
+  async deleteSession(sessionId) {
+    try {
+      await chatService.deleteSession(sessionId);
+      
+      // Remove session from local array
+      this.sessions = this.sessions.filter(session => session.id !== sessionId);
+      
+      // Re-render sessions list
+      this.renderSessions();
+      
+      // If current session was deleted, create a new one
+      const currentSession = chatService.getCurrentSession();
+      if (!currentSession) {
+        this.createNewSession();
+      } else {
+        // Update URL to reflect current session
+        history.replaceState({sessionId: currentSession.id}, '', `/chat/${currentSession.id}`);
+      }
+    } catch (error) {
+      console.error('Error deleting session:', error);
+      alert('Không thể xóa cuộc trò chuyện. Vui lòng thử lại sau.');
+    }
   }
 
   /**
@@ -116,6 +191,9 @@ export default class SessionComponent {
       const newSession = await chatService.createSession();
       this.sessions.unshift(newSession);
       this.renderSessions();
+      
+      // Update URL to include the new session ID
+      history.pushState({sessionId: newSession.id}, '', `/chat/${newSession.id}`);
       
       if (this.onSessionSelect) {
         this.onSessionSelect(newSession);

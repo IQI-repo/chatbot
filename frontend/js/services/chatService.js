@@ -202,10 +202,45 @@ class ChatService {
 
   /**
    * Get the current active session
-   * @returns {object} - Current session
+   * @returns {object} - Current session object
    */
   getCurrentSession() {
     return this.currentSession;
+  }
+  
+  /**
+   * Delete a chat session
+   * @param {number} sessionId - Session ID to delete
+   * @returns {Promise} - Promise with result
+   */
+  async deleteSession(sessionId) {
+    try {
+      const user = authService.getCurrentUser();
+      if (!user) throw new Error('User not logged in');
+
+      const response = await fetch(`${this.API_URL}/sessions/${sessionId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${user.token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete session');
+      }
+
+      const data = await response.json();
+      
+      // If we're deleting the current session, clear it
+      if (this.currentSession && this.currentSession.id === sessionId) {
+        this.currentSession = null;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error deleting session:', error);
+      throw error;
+    }
   }
 }
 

@@ -11,6 +11,13 @@ class App {
   constructor() {
     this.appContainer = document.getElementById('app');
     this.initialize();
+    
+    // Handle browser back/forward navigation
+    window.addEventListener('popstate', (event) => {
+      if (authService.isLoggedIn()) {
+        this.handleUrlRouting();
+      }
+    });
   }
 
   /**
@@ -20,8 +27,52 @@ class App {
     // Check if user is logged in
     if (authService.isLoggedIn()) {
       this.renderMainApp();
+      // Handle URL routing after rendering the main app
+      this.handleUrlRouting();
     } else {
       this.renderLogin();
+    }
+  }
+  
+  /**
+   * Handle URL routing based on current path
+   */
+  handleUrlRouting() {
+    const path = window.location.pathname;
+    const chatRegex = /\/chat\/([0-9]+)/;
+    const match = path.match(chatRegex);
+    
+    if (match && match[1]) {
+      const sessionId = parseInt(match[1]);
+      this.loadSpecificSession(sessionId);
+    }
+  }
+  
+  /**
+   * Load a specific chat session by ID
+   * @param {number} sessionId - The ID of the session to load
+   */
+  async loadSpecificSession(sessionId) {
+    try {
+      // Get all sessions
+      const sessions = await this.sessionComponent.loadSessions();
+      
+      // Find the specific session
+      const session = this.sessionComponent.sessions.find(s => s.id === sessionId);
+      
+      if (session) {
+        // Set as current session
+        chatService.setCurrentSession(session);
+        
+        // Re-render chat component
+        this.renderChatComponent();
+      } else {
+        console.error(`Session with ID ${sessionId} not found`);
+        // Redirect to base URL if session not found
+        history.replaceState(null, '', '/');
+      }
+    } catch (error) {
+      console.error('Error loading specific session:', error);
     }
   }
 
@@ -38,11 +89,13 @@ class App {
    * Render the main application (sessions and chat)
    */
   renderMainApp() {
-    // Create container for main app
+    // Create container for main app with side-by-side layout
     this.appContainer.innerHTML = `
       <div class="app-container">
-        <div id="session-container"></div>
-        <div id="chat-container"></div>
+        <div class="main-content">
+          <div id="chat-container" class="chat-section"></div>
+          <div id="session-container" class="session-section"></div>
+        </div>
       </div>
     `;
 

@@ -4,6 +4,7 @@
  */
 import authService from '../services/authService.js';
 import chatService from '../services/chatService.js';
+import ModalComponent from './ModalComponent.js';
 
 export default class ChatComponent {
   constructor(appContainer, onLogout) {
@@ -11,6 +12,7 @@ export default class ChatComponent {
     this.onLogout = onLogout;
     this.messages = [];
     this.isTyping = false;
+    this.modal = new ModalComponent();
     this.render();
     this.attachEventListeners();
   }
@@ -30,7 +32,17 @@ export default class ChatComponent {
             <div class="user-avatar">${userName.charAt(0).toUpperCase()}</div>
             <span>${userName}</span>
           </div>
-          <button class="logout-button" id="logout-button">Đăng xuất</button>
+          <div class="chat-header-actions">
+            <button class="delete-chat-button" id="delete-chat-button" title="Xóa cuộc trò chuyện">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18"></path>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+              </svg>
+            </button>
+            <button class="logout-button" id="logout-button">Đăng xuất</button>
+          </div>
         </div>
         <div class="chat-messages" id="chat-messages">
           <!-- Messages will be added here -->
@@ -206,7 +218,56 @@ export default class ChatComponent {
       }
     });
     
+    // Delete chat button
+    const deleteButton = document.getElementById('delete-chat-button');
+    if (deleteButton) {
+      deleteButton.addEventListener('click', () => this.confirmDeleteChat());
+    }
+    
     // Focus input on load
     this.messageInput.focus();
+  }
+  
+  /**
+   * Show confirmation modal before deleting the current chat
+   */
+  confirmDeleteChat() {
+    const currentSession = chatService.getCurrentSession();
+    if (!currentSession) {
+      alert('Không có cuộc trò chuyện nào để xóa.');
+      return;
+    }
+    
+    this.modal.show(
+      'Xóa cuộc trò chuyện', 
+      'Bạn có chắc chắn muốn xóa cuộc trò chuyện này? Hành động này không thể hoàn tác.',
+      () => this.deleteCurrentChat()
+    );
+  }
+  
+  /**
+   * Delete the current chat session
+   */
+  async deleteCurrentChat() {
+    try {
+      const currentSession = chatService.getCurrentSession();
+      if (!currentSession) return;
+      
+      await chatService.deleteSession(currentSession.id);
+      
+      // Create a new session
+      const newSession = await chatService.createSession();
+      
+      // Update URL to the new session
+      history.replaceState({sessionId: newSession.id}, '', `/chat/${newSession.id}`);
+      
+      // Reload the chat component
+      this.messages = [];
+      this.render();
+      this.attachEventListeners();
+    } catch (error) {
+      console.error('Error deleting chat session:', error);
+      alert('Không thể xóa cuộc trò chuyện. Vui lòng thử lại sau.');
+    }
   }
 }

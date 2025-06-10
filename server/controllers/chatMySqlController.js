@@ -233,17 +233,17 @@ exports.getChatStats = async (req, res) => {
   try {
     // Get total sessions
     const [sessionCount] = await pool.query(
-      `SELECT COUNT(*) as total FROM chat_sessions`
+      `SELECT COUNT(*) as count FROM chat_sessions`
     );
     
     // Get total messages
     const [messageCount] = await pool.query(
-      `SELECT COUNT(*) as total FROM chat_messages`
+      `SELECT COUNT(*) as count FROM chat_messages`
     );
     
-    // Get active users (users with at least one chat session)
-    const [activeUsers] = await pool.query(
-      `SELECT COUNT(DISTINCT user_id) as total FROM chat_sessions`
+    // Get total users
+    const [userCount] = await pool.query(
+      `SELECT COUNT(*) as count FROM users`
     );
     
     // Get average messages per session
@@ -255,17 +255,73 @@ exports.getChatStats = async (req, res) => {
        ) as message_counts`
     );
     
+    // Get most active user
+    const [activeUser] = await pool.query(
+      `SELECT u.name, COUNT(cs.id) as session_count 
+       FROM users u 
+       JOIN chat_sessions cs ON u.id = cs.user_id 
+       GROUP BY u.id 
+       ORDER BY session_count DESC 
+       LIMIT 1`
+    );
+    
     return res.json({
       success: true,
       stats: {
-        totalSessions: sessionCount[0].total,
-        totalMessages: messageCount[0].total,
-        activeUsers: activeUsers[0].total,
-        averageMessagesPerSession: avgMessages[0].average || 0
+        totalSessions: sessionCount[0].count,
+        totalMessages: messageCount[0].count,
+        totalUsers: userCount[0].count,
+        avgMessagesPerSession: avgMessages[0].average || 0,
+        mostActiveUser: activeUser[0] || null
       }
     });
   } catch (error) {
-    console.error('Error fetching chat statistics:', error);
+    console.error('Error fetching chat stats:', error);
     return res.status(500).json({ success: false, error: 'Failed to fetch chat statistics' });
+  }
+};
+
+/**
+ * Delete a chat session and its messages
+ */
+exports.deleteChatSession = async (req, res) => {
+  try {
+    const { session_id } = req.params;
+    
+    // Start a transaction to ensure data consistency
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+    
+    try {
+      // First delete all messages in the session
+      await connection.query(
+        `DELETE FROM chat_messages WHERE session_id = ?`,
+        [session_id]
+      );
+      
+      // Then delete the session itself
+      const [result] = await connection.query(
+        `DELETE FROM chat_sessions WHERE id = ?`,
+        [session_id]
+      );
+      
+      // Commit the transaction
+      await connection.commit();
+      connection.release();
+      
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ success: false, error: 'Chat session not found' });
+      }
+      
+      return res.json({ success: true, message: 'Chat session deleted successfully' });
+    } catch (error) {
+      // Rollback in case of error
+      await connection.rollback();
+      connection.release();
+      throw error;
+    }
+  } catch (error) {
+    console.error('Error deleting chat session:', error);
+    return res.status(500).json({ success: false, error: 'Failed to delete chat session' });
   }
 };
