@@ -1,5 +1,6 @@
 const { pool } = require('../utils/db');
 const { chatWithOpenAI } = require('../ai/openai');
+const { isFoodRelatedQuery, getRestaurantInfo, formatRestaurantResponse } = require('../utils/restaurantApi');
 
 // Optional imports with error handling
 let analyzeImage, createVoiceMp3;
@@ -159,10 +160,30 @@ exports.sendChatMessage = async (req, res) => {
       try {
         console.log('Processing message with AI:', message);
         
-        // Process with AI and get response
+        // Check if the message is food-related
         let aiReply;
+        let contextData = '';
+        
+        if (isFoodRelatedQuery(message)) {
+          try {
+            console.log('Food-related query detected, calling restaurant API');
+            const restaurantData = await getRestaurantInfo(message);
+            
+            // Format the restaurant data into a readable response
+            const formattedResponse = formatRestaurantResponse(restaurantData);
+            
+            // Use the formatted response as context for the AI
+            contextData = formattedResponse;
+            console.log('Restaurant API response:', formattedResponse);
+          } catch (restaurantError) {
+            console.error('Error getting restaurant information:', restaurantError);
+            // Continue with normal AI processing if restaurant API fails
+          }
+        }
+        
+        // Process with AI and get response
         if (chatWithOpenAI) {
-          aiReply = await chatWithOpenAI(message);
+          aiReply = await chatWithOpenAI(message, contextData);
         } else {
           aiReply = "I'm sorry, the AI service is currently unavailable.";
           console.error('chatWithOpenAI function is not available');
