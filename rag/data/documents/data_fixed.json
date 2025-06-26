@@ -1,0 +1,52 @@
+[
+  {
+    "id": 6,
+    "name": "TRÀ SỮA IGRON - 3 THÁNG 2",
+    "image": "/assets/img/restaurants/restaurant-1638947836357.jpg",
+    "items": [
+      {
+        "id": 400,
+        "name": "Trà Sữa CACAO (Size M)",
+        "image": "/assets/img/items/item-1639217668254.jpg",
+        "price": 20000.00,
+        "is_active": 1
+      },
+      {
+        "id": 598,
+        "name": "Trà Sữa MATCHA (Size L)",
+        "image": "/assets/img/items/item-1639217657547.jpg",
+        "price": 25000.00,
+        "is_active": 1
+      }
+    ],
+    "address": "P7 - 02 Đường 3 Tháng 2, KĐT Phú Cường, P. An Hoà, Rạch Giá, Kiên Giang",
+    "latitude": 9.969815254211426,
+    "longitude": 105.09773254394531,
+    "time_open": {"type":"ALL","data":{"start":"09:00","end":"21:00"}}
+  },
+  {
+    "id": 9,
+    "name": "GÀ TRE HƯƠNG VIỆT - 3 THÁNG 2",
+    "image": "/assets/img/restaurants/img-17229164864891PtkK.jpg",
+    "items": [
+      {
+        "id": 46716,
+        "name": "Gà luộc",
+        "image": "/assets/img/items/item-1666085885833QJWAk4D.jpg",
+        "price": 210000.00,
+        "is_active": 1
+      },
+      {
+        "id": 46717,
+        "name": "Gỏi gà",
+        "image": "/assets/img/items/item-1666085918700s55teHb.jpg",
+        "price": 225000.00,
+        "is_active": 1
+      }
+    ],
+    "address": "H10 - 25, 26 Đường 3 Tháng 2, P. An Hoà, Rạch Giá, Kiên Giang",
+    "latitude": 9.977370262145996,
+    "longitude": 105.09400177001952,
+    "time_open": {"type":"ALL","data":{"start":"22:00","end":"22:00"}}
+  }
+]
