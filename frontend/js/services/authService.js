@@ -4,7 +4,7 @@
  */
 class AuthService {
   constructor() {
-    this.API_URL = 'http://103.116.9.57:3002';
+    this.API_URL = 'https://boship.vn';
     this.currentUser = this.getUserFromStorage();
   }
 

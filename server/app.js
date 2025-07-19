@@ -4,6 +4,7 @@ const dotenv = require('dotenv');
 const bodyParser = require('body-parser');
 const path = require('path');
 const { testConnection } = require('./utils/db');
+const { swaggerUi, swaggerSpec } = require('./swagger');
 
 dotenv.config();
 
@@ -20,6 +21,13 @@ app.use('/data', express.static(path.join(__dirname, '../data')));
 // Handle chat routes for client-side routing
 app.get('/chat/:id', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend/index.html'));
+});
+
+// Swagger API documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.get('/api-docs.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
 });
 
 app.use('/api/chat', require('./routes/chat'));
