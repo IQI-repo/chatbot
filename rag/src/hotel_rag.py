@@ -238,17 +238,16 @@ class HotelRAG:
             hotel_name = room_info.get('hotel_name', 'Unknown hotel')
             context += f"- {room.get('name', 'Unknown')} - Price: {room.get('price', 0)} VND at {hotel_name}\n"
         
-        # Create system prompt with location awareness
-        system_prompt = "You are a helpful assistant specializing in Vietnamese hotels. "
+        # Get the system prompt for hotel context
+        from src.system_prompt import get_system_prompt_by_context
+        system_prompt = get_system_prompt_by_context("hotel")
         
+        # Add location awareness to the system prompt if location is detected
         if location:
-            system_prompt += f"The user is asking about hotels near '{location}'. "
-            system_prompt += "Pay special attention to hotel locations and their proximity to this place. "
-            system_prompt += "If coordinates are provided, use them to determine which hotels are closest to the mentioned location. "
-        
-        system_prompt += "Use the provided context to answer the question in Vietnamese. "
-        system_prompt += "If the information is not in the context, say you don't have that information. "
-        system_prompt += "When discussing hotel locations, be specific about their proximity to landmarks or areas the user mentioned."
+            location_info = f"\n\nNgười dùng đang hỏi về khách sạn gần '{location}'. "
+            location_info += "Hãy chú ý đặc biệt đến vị trí khách sạn và khoảng cách đến địa điểm này. "
+            location_info += "Nếu có tọa độ, hãy sử dụng chúng để xác định khách sạn nào gần địa điểm được đề cập nhất."
+            system_prompt += location_info
         
         # Create prompt
         prompt = f"""Context: {context}\n\nQuestion: {query}\n\nAnswer:"""

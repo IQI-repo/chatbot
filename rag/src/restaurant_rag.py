@@ -158,10 +158,14 @@ class RestaurantRAG:
         # Get response from OpenAI (using v0.28.1 format)
         try:
             logging.debug("Sending request to OpenAI for restaurant query")
+            # Get the system prompt for restaurant context
+            from src.system_prompt import get_system_prompt_by_context
+            system_prompt = get_system_prompt_by_context("restaurant")
+            
             response = openai.ChatCompletion.create(
                 model="gpt-4o",
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant specializing in Vietnamese restaurants and food. Use the provided context to answer the question in Vietnamese. If the information is not in the context, say you don't have that information."},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt}
                 ]
             )

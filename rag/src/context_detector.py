@@ -42,35 +42,36 @@ class ContextDetector:
             
             # Define the prompt for context detection
             system_prompt = """
-            You are a context detection system. Your task is to analyze the user's query and determine 
-            which service category they are referring to. Respond with a JSON object only, no explanations.
+            Bạn là trợ lí ảo Bé Bơ, phụ trách phân loại câu hỏi của người dùng. Nhiệm vụ của bạn là xác định câu hỏi thuộc danh mục dịch vụ nào.
+            Phân tích câu hỏi và xác định nó thuộc vào một trong các ngữ cảnh sau:
             
-            Available service categories:
-            - restaurant: Anything related to food, dining, restaurants, cafes, meals, etc.
-            - accommodation: Anything related to hotels, resorts, homestays, rooms, lodging, etc.
-            - transportation: Anything related to drivers, taxis, car services, transportation, etc.
-            - tourism: Anything related to tours, attractions, sightseeing, activities, etc.
-            - general: General queries not specific to any service
+            1. restaurant - Câu hỏi về đồ ăn, ăn uống, nhà hàng, thực đơn, món ăn, ẩm thực, v.v.
+            2. accommodation - Câu hỏi về khách sạn, phòng ở, lưu trú, tiện nghi, v.v.
+            3. delivery - Câu hỏi về dịch vụ giao hàng, vận chuyển hàng hóa, đơn hàng, theo dõi giao hàng, v.v.
+            4. transportation - Câu hỏi về di chuyển, đi lại, tài xế, phương tiện, v.v.
+            5. tourism - Câu hỏi về điểm tham quan, thắng cảnh, tour du lịch, v.v.
+            6. general - Câu hỏi chung không thuộc các danh mục trên
             
-            Your response should be in this format:
+            Trả lời của bạn phải là một đối tượng JSON với cấu trúc sau:
             {
-                "primary_context": "category_name",
-                "confidence": 0.XX,
+                "primary_context": "[Danh mục chính - phải là một trong các giá trị: restaurant, accommodation, delivery, transportation, tourism, general]",
+                "confidence": [Một số từ 0 đến 1 chỉ mức độ tin cậy],
                 "all_contexts": {
-                    "restaurant": 0.XX,
-                    "accommodation": 0.XX,
-                    "transportation": 0.XX,
-                    "tourism": 0.XX,
-                    "general": 0.XX
+                    "restaurant": [Điểm từ 0 đến 1],
+                    "accommodation": [Điểm từ 0 đến 1],
+                    "delivery": [Điểm từ 0 đến 1],
+                    "transportation": [Điểm từ 0 đến 1],
+                    "tourism": [Điểm từ 0 đến 1],
+                    "general": [Điểm từ 0 đến 1]
                 }
             }
             
-            The confidence scores should sum to 1.0 across all categories.
+            Tổng của tất cả điểm số nên xấp xỉ bằng 1.0.
             """
             
             # Using OpenAI 0.28.1 format
             response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4o",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": query}
@@ -87,7 +88,21 @@ class ContextDetector:
             
             # Parse the JSON response
             import json
-            context_data = json.loads(result)
+            import re
+            
+            # Clean up the response if it contains markdown code blocks
+            # Pattern to match markdown code blocks: ```json ... ```
+            json_pattern = re.compile(r'```(?:json)?\s*(.+?)\s*```', re.DOTALL)
+            match = json_pattern.search(result)
+            
+            if match:
+                # Extract the JSON content from the code block
+                json_content = match.group(1).strip()
+                logging.debug(f"Extracted JSON from markdown: {json_content}")
+                context_data = json.loads(json_content)
+            else:
+                # Try parsing the raw response if no code block is found
+                context_data = json.loads(result)
             
             return context_data
             

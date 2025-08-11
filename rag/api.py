@@ -2,7 +2,9 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from src.restaurant_rag import RestaurantRAG
 from src.hotel_rag import HotelRAG
+from src.delivery_rag import DeliveryRAG
 from src.context_detector import ContextDetector
+from src.system_prompt import get_system_prompt_by_context
 import uvicorn
 import logging
 import traceback
@@ -39,6 +41,7 @@ def get_db_connection():
 # Initialize the RAG systems
 restaurant_rag = RestaurantRAG()
 hotel_rag = HotelRAG()
+delivery_rag = DeliveryRAG()
 context_detector = ContextDetector()
 
 # Create FastAPI app
@@ -248,7 +251,9 @@ async def unified_query(query: Query):
         if primary_context == "restaurant":
             service_name = "restaurant"
             # Get answer from Restaurant RAG system
-            answer = restaurant_rag.answer_restaurant_query(query.question)
+            raw_answer = restaurant_rag.answer_restaurant_query(query.question)
+            # Format as Vietnamese response from Bé Bơ
+            answer = f"Xin chào, mình là trợ lí ảo bé bơ. {raw_answer} Nếu bạn cần thêm thông tin, vui lòng tham khảo tại website https://shipperrachgia.vn/ nhé!"
             
             # Get top matching restaurants
             top_restaurants = restaurant_rag.search_restaurants(query.question, top_k=3)
@@ -275,7 +280,9 @@ async def unified_query(query: Query):
             service_name = "hotel"
             # Get answer from Hotel RAG system
             result = hotel_rag.answer_hotel_query(query.question)
-            answer = result["answer"]
+            raw_answer = result["answer"]
+            # Format as Vietnamese response from Bé Bơ
+            answer = f"Xin chào, mình là trợ lí ảo bé bơ. {raw_answer} Nếu bạn cần thêm thông tin, vui lòng tham khảo tại website https://shipperrachgia.vn/ nhé!"
             
             # Get top matching hotels
             top_hotels = result["top_hotels"]
@@ -297,11 +304,39 @@ async def unified_query(query: Query):
                 room_name = room.get('name', 'Unknown')
                 hotel_id = room_info.get('hotel_id', 'unknown')
                 top_childs.append(UnifiedChild(id=str(room_id), name=room_name, parentId=str(hotel_id)))
+                
+        elif primary_context == "delivery":
+            service_name = "delivery"
+            # Get answer from Delivery RAG system
+            result = delivery_rag.answer_delivery_query(query.question)
+            raw_answer = result["answer"]
+            # Format as Vietnamese response from Bé Bơ
+            answer = f"Xin chào, mình là trợ lí ảo bé bơ. {raw_answer} Nếu bạn cần thêm thông tin, vui lòng tham khảo tại website https://shipperrachgia.vn/ nhé!"
+            
+            # Get top matching delivery data
+            top_delivery_data = result["top_delivery_data"]
+            
+            # Get top matching delivery details
+            top_delivery_details = result["top_delivery_details"]
+            
+            # Format as unified response
+            top_parents = []
+            for delivery in top_delivery_data:
+                delivery_id = delivery.get('id', 'unknown')
+                name = delivery.get('name', 'Unknown')
+                top_parents.append(UnifiedParent(id=str(delivery_id), name=name))
+            
+            top_childs = []
+            for detail in top_delivery_details:
+                detail_id = detail.get('delivery_id', 'unknown')
+                detail_name = detail.get('delivery_type', 'Unknown')
+                delivery_id = detail.get('delivery_id', 'unknown')
+                top_childs.append(UnifiedChild(id=str(detail_id), name=detail_name, parentId=str(delivery_id)))
             
         else:
             # For contexts we don't have specific handlers for yet
             service_name = primary_context
-            answer = f"I understand you're asking about {primary_context}, but we don't have specific information about that service yet."
+            answer = f"Xin chào, mình là trợ lí ảo bé bơ. Mình hiểu bạn đang hỏi về {primary_context}, nhưng hiện tại mình chưa có thông tin cụ thể về dịch vụ này. Bạn có thể tham khảo thêm tại website https://shipperrachgia.vn/ để biết thêm chi tiết nhé!"
             top_parents = []
             top_childs = []
         
