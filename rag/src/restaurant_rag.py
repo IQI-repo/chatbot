@@ -159,7 +159,7 @@ class RestaurantRAG:
         try:
             logging.debug("Sending request to OpenAI for restaurant query")
             response = openai.ChatCompletion.create(
-                model="gpt-4-turbo-preview",
+                model="gpt-4o",
                 messages=[
                     {"role": "system", "content": "You are a helpful assistant specializing in Vietnamese restaurants and food. Use the provided context to answer the question in Vietnamese. If the information is not in the context, say you don't have that information."},
                     {"role": "user", "content": prompt}
