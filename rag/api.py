@@ -5,6 +5,9 @@ from src.hotel_rag import HotelRAG
 from src.delivery_rag import DeliveryRAG
 from src.context_detector import ContextDetector
 from src.system_prompt import get_system_prompt_by_context
+from src.web_search import WebSearch
+from src.chat_rag import ChatRAG
+from src.scheduler import RagScheduler
 import uvicorn
 import logging
 import traceback
@@ -43,6 +46,12 @@ restaurant_rag = RestaurantRAG()
 hotel_rag = HotelRAG()
 delivery_rag = DeliveryRAG()
 context_detector = ContextDetector()
+web_search = WebSearch()
+chat_rag = ChatRAG()
+
+# Initialize and start the scheduler
+scheduler = RagScheduler(refresh_interval_minutes=10)
+scheduler.start()
 
 # Create FastAPI app
 app = FastAPI(
@@ -53,6 +62,8 @@ app = FastAPI(
 
 class Query(BaseModel):
     question: str
+    user_id: str = "anonymous"
+    session_id: str = None
 
 class RestaurantResponse(BaseModel):
     answer: str
@@ -97,6 +108,15 @@ async def restaurant_query(query: Query):
         logging.debug("Calling answer_restaurant_query")
         answer = restaurant_rag.answer_restaurant_query(query.question)
         logging.debug(f"Got answer: {answer[:50]}...")
+        
+        # Store the interaction in chat history
+        chat_rag.store_chat_interaction(
+            user_id=query.user_id,
+            question=query.question,
+            answer=answer,
+            context_type="restaurant",
+            session_id=query.session_id
+        )
         
         # Get top matching restaurants
         logging.debug("Calling search_restaurants")
@@ -253,7 +273,7 @@ async def unified_query(query: Query):
             # Get answer from Restaurant RAG system
             raw_answer = restaurant_rag.answer_restaurant_query(query.question)
             # Format as Vietnamese response from Bé Bơ
-            answer = f"Xin chào, mình là trợ lí ảo bé bơ. {raw_answer} Nếu bạn cần thêm thông tin, vui lòng tham khảo tại website https://shipperrachgia.vn/ nhé!"
+            answer = f"{raw_answer} Nếu bạn cần thêm thông tin, vui lòng tham khảo tại website https://shipperrachgia.vn/ nhé!"
             
             # Get top matching restaurants
             top_restaurants = restaurant_rag.search_restaurants(query.question, top_k=3)
@@ -279,10 +299,20 @@ async def unified_query(query: Query):
         elif primary_context == "accommodation":
             service_name = "hotel"
             # Get answer from Hotel RAG system
+            logging.debug("Calling answer_hotel_query")
             result = hotel_rag.answer_hotel_query(query.question)
             raw_answer = result["answer"]
             # Format as Vietnamese response from Bé Bơ
-            answer = f"Xin chào, mình là trợ lí ảo bé bơ. {raw_answer} Nếu bạn cần thêm thông tin, vui lòng tham khảo tại website https://shipperrachgia.vn/ nhé!"
+            answer = f"Xin chào anh! Em là Bé Bơ đây ạ! ❤️ {raw_answer} Nếu anh cần thêm thông tin, vui lòng tham khảo tại website https://shipperrachgia.vn/ nhé! 🥰"
+            
+            # Store the interaction in chat history
+            chat_rag.store_chat_interaction(
+                user_id=query.user_id,
+                question=query.question,
+                answer=answer,
+                context_type="hotel",
+                session_id=query.session_id
+            )
             
             # Get top matching hotels
             top_hotels = result["top_hotels"]
@@ -311,7 +341,16 @@ async def unified_query(query: Query):
             result = delivery_rag.answer_delivery_query(query.question)
             raw_answer = result["answer"]
             # Format as Vietnamese response from Bé Bơ
-            answer = f"Xin chào, mình là trợ lí ảo bé bơ. {raw_answer} Nếu bạn cần thêm thông tin, vui lòng tham khảo tại website https://shipperrachgia.vn/ nhé!"
+            answer = f"Xin chào anh! Em là Bé Bơ đây ạ! ❤️ {raw_answer} Nếu anh cần thêm thông tin, vui lòng tham khảo tại website https://shipperrachgia.vn/ nhé! 🥰"
+            
+            # Store the interaction in chat history
+            chat_rag.store_chat_interaction(
+                user_id=query.user_id,
+                question=query.question,
+                answer=answer,
+                context_type="delivery",
+                session_id=query.session_id
+            )
             
             # Get top matching delivery data
             top_delivery_data = result["top_delivery_data"]
@@ -336,7 +375,36 @@ async def unified_query(query: Query):
         else:
             # For contexts we don't have specific handlers for yet
             service_name = primary_context
-            answer = f"Xin chào, mình là trợ lí ảo bé bơ. Mình hiểu bạn đang hỏi về {primary_context}, nhưng hiện tại mình chưa có thông tin cụ thể về dịch vụ này. Bạn có thể tham khảo thêm tại website https://shipperrachgia.vn/ để biết thêm chi tiết nhé!"
+            
+            logging.info(f"No specific handler for context {primary_context}, trying web search")
+            search_result = web_search.search_web(query.question)
+            
+            if search_result["success"]:
+                # If web search was successful, use the formatted answer
+                answer = search_result["answer"]
+                logging.info("Web search successful, using search results")
+            else:
+                # Before giving up, check if we have similar questions in chat history
+                similar_questions = chat_rag.search_similar_questions(query.question, limit=1)
+                
+                if similar_questions and similar_questions[0]["similarity_score"] > 0.85:
+                    # Use the answer from a similar question if it's very similar
+                    answer = similar_questions[0]["answer"]
+                    logging.info(f"Using answer from similar question with score {similar_questions[0]['similarity_score']}")
+                else:
+                    # If web search failed and no similar questions, use the default fallback response
+                    answer = f"Xin chào anh! Em là Bé Bơ đây ạ! ❤️\n\nEm chưa có thông tin cụ thể về dịch vụ này. Anh có thể chia sẻ thêm về điều anh đang tìm kiếm được không ạ? Em rất muốn được giúp anh tốt hơn!\n\nTrong lúc đó, anh có thể tham khảo thêm thông tin tại website https://shipperrachgia.vn/ nha!\n\nEm là Bé Bơ luôn sẵn sàng phục vụ anh! 🥰"
+                    logging.warning(f"Web search failed: {search_result['answer']}")
+            
+            # Store the interaction in chat history
+            chat_rag.store_chat_interaction(
+                user_id=query.user_id,
+                question=query.question,
+                answer=answer,
+                context_type=service_name,
+                session_id=query.session_id
+            )
+            
             top_parents = []
             top_childs = []
         
@@ -353,6 +421,13 @@ async def unified_query(query: Query):
         logging.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error processing unified query: {str(e)}")
 
+
+# Add shutdown event to stop the scheduler when the API stops
+@app.on_event("shutdown")
+def shutdown_event():
+    logging.info("Shutting down scheduler...")
+    scheduler.stop()
+    logging.info("Scheduler stopped")
 
 if __name__ == "__main__":
     uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True)
