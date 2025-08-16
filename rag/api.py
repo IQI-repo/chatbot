@@ -273,7 +273,7 @@ async def unified_query(query: Query):
             # Get answer from Restaurant RAG system
             raw_answer = restaurant_rag.answer_restaurant_query(query.question)
             # Format as Vietnamese response from Bé Bơ
-            answer = f"{raw_answer} Nếu bạn cần thêm thông tin, vui lòng tham khảo tại website https://shipperrachgia.vn/ nhé!"
+            answer = f"Xin chào anh/chị! Em là Bé Bơ đây ạ! ❤️\n\n{raw_answer}\n\nDạ để được nhận nhiều Ưu Đãi và Khuyến Mãi A/C vui lòng nhắn vào đây giúp Bé Bơ ạ https://zalo.me/4018474138015540620 Hoặc gọi: 1900585878 - 0939785878. Giúp em nha!"
             
             # Get top matching restaurants
             top_restaurants = restaurant_rag.search_restaurants(query.question, top_k=3)
@@ -303,7 +303,7 @@ async def unified_query(query: Query):
             result = hotel_rag.answer_hotel_query(query.question)
             raw_answer = result["answer"]
             # Format as Vietnamese response from Bé Bơ
-            answer = f"Xin chào anh! Em là Bé Bơ đây ạ! ❤️ {raw_answer} Nếu anh cần thêm thông tin, vui lòng tham khảo tại website https://shipperrachgia.vn/ nhé! 🥰"
+            answer = f"Xin chào anh/chị! Em là Bé Bơ đây ạ! ❤️\n\n{raw_answer}\n\nDạ để được nhận nhiều Ưu Đãi và Khuyến Mãi A/C vui lòng nhắn vào đây giúp Bé Bơ ạ https://zalo.me/4018474138015540620 Hoặc gọi: 1900585878 - 0939785878. Giúp em nha!"
             
             # Store the interaction in chat history
             chat_rag.store_chat_interaction(
@@ -341,7 +341,7 @@ async def unified_query(query: Query):
             result = delivery_rag.answer_delivery_query(query.question)
             raw_answer = result["answer"]
             # Format as Vietnamese response from Bé Bơ
-            answer = f"Xin chào anh! Em là Bé Bơ đây ạ! ❤️ {raw_answer} Nếu anh cần thêm thông tin, vui lòng tham khảo tại website https://shipperrachgia.vn/ nhé! 🥰"
+            answer = f"Xin chào anh/chị! Em là Bé Bơ đây ạ! ❤️\n\n{raw_answer}\n\nDạ để được nhận nhiều Ưu Đãi và Khuyến Mãi A/C vui lòng nhắn vào đây giúp Bé Bơ ạ https://zalo.me/4018474138015540620 Hoặc gọi: 1900585878 - 0939785878. Giúp em nha!"
             
             # Store the interaction in chat history
             chat_rag.store_chat_interaction(
@@ -393,7 +393,7 @@ async def unified_query(query: Query):
                     logging.info(f"Using answer from similar question with score {similar_questions[0]['similarity_score']}")
                 else:
                     # If web search failed and no similar questions, use the default fallback response
-                    answer = f"Xin chào anh! Em là Bé Bơ đây ạ! ❤️\n\nEm chưa có thông tin cụ thể về dịch vụ này. Anh có thể chia sẻ thêm về điều anh đang tìm kiếm được không ạ? Em rất muốn được giúp anh tốt hơn!\n\nTrong lúc đó, anh có thể tham khảo thêm thông tin tại website https://shipperrachgia.vn/ nha!\n\nEm là Bé Bơ luôn sẵn sàng phục vụ anh! 🥰"
+                    answer = f"Xin chào anh/chị! Em là Bé Bơ đây ạ! ❤️\n\nEm chưa có thông tin cụ thể về dịch vụ này. Anh/chị có thể chia sẻ thêm về điều anh/chị đang tìm kiếm được không ạ? Em rất muốn được giúp anh/chị tốt hơn!\n\nTrong lúc đó, anh/chị có thể tham khảo thêm thông tin tại website https://shipperrachgia.vn/ nha!\n\nDạ để được nhận nhiều Ưu Đãi và Khuyến Mãi A/C vui lòng nhắn vào đây giúp Bé Bơ ạ https://zalo.me/4018474138015540620 Hoặc gọi: 1900585878 - 0939785878. Giúp em nha!"
                     logging.warning(f"Web search failed: {search_result['answer']}")
             
             # Store the interaction in chat history
