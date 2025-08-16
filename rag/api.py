@@ -263,7 +263,7 @@ async def unified_query(query: Query):
         if not query.question.strip():
             logging.info("Received empty question, sending welcome message")
             return UnifiedResponse(
-                answer="Xin chào anh/chị! Em là Bé Bơ đây ạ! ❤️\n\nEm là trợ lý ảo của ShipperRachGia.vn, em có thể giúp anh/chị tìm hiểu về:\n- Nhà hàng và món ăn ngon tại Rạch Giá\n- Khách sạn và dịch vụ lưu trú\n- Dịch vụ giao hàng và vận chuyển\n\nAnh/chị có thể hỏi em bất cứ điều gì về các dịch vụ của ShipperRachGia.vn!\n\nDạ để được nhận nhiều Ưu Đãi và Khuyến Mãi A/C vui lòng nhắn vào đây giúp Bé Bơ ạ https://zalo.me/4018474138015540620 Hoặc gọi: 1900585878 - 0939785878. Giúp em nha!",
+                answer="Xin chào anh/chị! Em là Bé Bơ đây ạ! ❤️\n\nEm là nhân viên tư vấn của ShipperRachGia.vn, em có thể giúp anh/chị tìm hiểu về:\n- Nhà hàng và món ăn ngon tại Rạch Giá\n- Khách sạn và dịch vụ lưu trú\n- Dịch vụ giao hàng và vận chuyển\n\nAnh/chị có thể hỏi em bất cứ điều gì về các dịch vụ của ShipperRachGia.vn!\n\nDạ để được nhận nhiều Ưu Đãi và Khuyến Mãi A/C vui lòng nhắn vào đây giúp Bé Bơ ạ https://zalo.me/4018474138015540620 Hoặc gọi: 1900585878 - 0939785878. Giúp em nha!",
                 service_name="welcome",
                 top_parents=[],
                 top_childs=[]
