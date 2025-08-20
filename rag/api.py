@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from src.restaurant_rag import RestaurantRAG
 from src.hotel_rag import HotelRAG
 from src.delivery_rag import DeliveryRAG
+from src.orders_rag import OrdersRAG
 from src.context_detector import ContextDetector
 from src.system_prompt import get_system_prompt_by_context
 from src.web_search import WebSearch
@@ -45,13 +46,14 @@ def get_db_connection():
 restaurant_rag = RestaurantRAG()
 hotel_rag = HotelRAG()
 delivery_rag = DeliveryRAG()
+orders_rag = OrdersRAG()
 context_detector = ContextDetector()
 web_search = WebSearch()
 chat_rag = ChatRAG()
 
-# Initialize and start the scheduler
+# Initialize the scheduler but don't start it to avoid Qdrant timeouts
 scheduler = RagScheduler(refresh_interval_minutes=10)
-scheduler.start()
+# scheduler.start()  # Disabled to prevent Qdrant timeouts
 
 # Create FastAPI app
 app = FastAPI(
@@ -282,7 +284,7 @@ async def unified_query(query: Query):
             # Get answer from Restaurant RAG system
             raw_answer = restaurant_rag.answer_restaurant_query(query.question)
             # Format as Vietnamese response from Bé Bơ
-            answer = f"Xin chào anh/chị! Em là Bé Bơ đây ạ! ❤️\n\n{raw_answer}\n\nDạ để được nhận nhiều Ưu Đãi và Khuyến Mãi A/C vui lòng nhắn vào đây giúp Bé Bơ ạ https://zalo.me/4018474138015540620 Hoặc gọi: 1900585878 - 0939785878. Giúp em nha!"
+            answer = f"❤️\n\n{raw_answer}\n\nDạ để được nhận nhiều Ưu Đãi và Khuyến Mãi A/C vui lòng nhắn vào đây giúp Bé Bơ ạ https://zalo.me/4018474138015540620 Hoặc gọi: 1900585878 - 0939785878. Giúp em nha!"
             
             # Get top matching restaurants
             top_restaurants = restaurant_rag.search_restaurants(query.question, top_k=3)
@@ -312,7 +314,7 @@ async def unified_query(query: Query):
             result = hotel_rag.answer_hotel_query(query.question)
             raw_answer = result["answer"]
             # Format as Vietnamese response from Bé Bơ
-            answer = f"Xin chào anh/chị! Em là Bé Bơ đây ạ! ❤️\n\n{raw_answer}\n\nDạ để được nhận nhiều Ưu Đãi và Khuyến Mãi A/C vui lòng nhắn vào đây giúp Bé Bơ ạ https://zalo.me/4018474138015540620 Hoặc gọi: 1900585878 - 0939785878. Giúp em nha!"
+            answer = f"❤️\n\n{raw_answer}\n\nDạ để được nhận nhiều Ưu Đãi và Khuyến Mãi A/C vui lòng nhắn vào đây giúp Bé Bơ ạ https://zalo.me/4018474138015540620 Hoặc gọi: 1900585878 - 0939785878. Giúp em nha!"
             
             # Store the interaction in chat history
             chat_rag.store_chat_interaction(
@@ -350,7 +352,7 @@ async def unified_query(query: Query):
             result = delivery_rag.answer_delivery_query(query.question)
             raw_answer = result["answer"]
             # Format as Vietnamese response from Bé Bơ
-            answer = f"Xin chào anh/chị! Em là Bé Bơ đây ạ! ❤️\n\n{raw_answer}\n\nDạ để được nhận nhiều Ưu Đãi và Khuyến Mãi A/C vui lòng nhắn vào đây giúp Bé Bơ ạ https://zalo.me/4018474138015540620 Hoặc gọi: 1900585878 - 0939785878. Giúp em nha!"
+            answer = f"❤️\n\n{raw_answer}\n\nDạ để được nhận nhiều Ưu Đãi và Khuyến Mãi A/C vui lòng nhắn vào đây giúp Bé Bơ ạ https://zalo.me/4018474138015540620 Hoặc gọi: 1900585878 - 0939785878. Giúp em nha!"
             
             # Store the interaction in chat history
             chat_rag.store_chat_interaction(
@@ -381,6 +383,43 @@ async def unified_query(query: Query):
                 delivery_id = detail.get('delivery_id', 'unknown')
                 top_childs.append(UnifiedChild(id=str(detail_id), name=detail_name, parentId=str(delivery_id)))
             
+        elif primary_context == "order":
+            service_name = "order"
+            result = orders_rag.answer_order_query(query.question)
+            raw_answer = result["answer"]
+            answer = f"❤️\n\n{raw_answer}\n\nDạ để được nhận nhiều Ưu Đãi và Khuyến Mãi A/C vui lòng nhắn vào đây giúp Bé Bơ ạ https://zalo.me/4018474138015540620 Hoặc gọi: 1900585878 - 0939785878. Giúp em nha!"
+            
+            chat_rag.store_chat_interaction(
+                user_id=query.user_id,
+                question=query.question,
+                answer=answer,
+                context_type="order",
+                session_id=query.session_id
+            )
+            
+            orders = result.get("orders", [])
+            
+            top_parents = []
+            for order in orders[:5]:  # Limit to 5 orders
+                order_id = order.get('id', 'unknown')
+                order_type = order.get('type_order_id', 'Unknown')
+                name = f"{order_type} Order #{order_id}"
+                top_parents.append(UnifiedParent(id=str(order_id), name=name))
+            
+            top_childs = []
+            for order in orders[:5]:  # Limit to 5 orders
+                order_id = order.get('id', 'unknown')
+                # Add order details as children
+                if 'total' in order:
+                    child_id = f"{order_id}_total"
+                    child_name = f"Total: {order.get('total')} VND"
+                    top_childs.append(UnifiedChild(id=str(child_id), name=child_name, parentId=str(order_id)))
+                
+                if 'address' in order:
+                    child_id = f"{order_id}_address"
+                    child_name = f"Address: {order.get('address')}"
+                    top_childs.append(UnifiedChild(id=str(child_id), name=child_name, parentId=str(order_id)))
+            
         else:
             # For contexts we don't have specific handlers for yet
             service_name = primary_context
@@ -402,7 +441,7 @@ async def unified_query(query: Query):
                     logging.info(f"Using answer from similar question with score {similar_questions[0]['similarity_score']}")
                 else:
                     # If web search failed and no similar questions, use the default fallback response
-                    answer = f"Xin chào anh/chị! Em là Bé Bơ đây ạ! ❤️\n\nEm chưa có thông tin cụ thể về dịch vụ này. Anh/chị có thể chia sẻ thêm về điều anh/chị đang tìm kiếm được không ạ? Em rất muốn được giúp anh/chị tốt hơn!\n\nTrong lúc đó, anh/chị có thể tham khảo thêm thông tin tại website https://shipperrachgia.vn/ nha!\n\nDạ để được nhận nhiều Ưu Đãi và Khuyến Mãi A/C vui lòng nhắn vào đây giúp Bé Bơ ạ https://zalo.me/4018474138015540620 Hoặc gọi: 1900585878 - 0939785878. Giúp em nha!"
+                    answer = f"❤️\n\nEm chưa có thông tin cụ thể về dịch vụ này. Anh/chị có thể chia sẻ thêm về điều anh/chị đang tìm kiếm được không ạ? Em rất muốn được giúp anh/chị tốt hơn!\n\nTrong lúc đó, anh/chị có thể tham khảo thêm thông tin tại website https://shipperrachgia.vn/ nha!\n\nDạ để được nhận nhiều Ưu Đãi và Khuyến Mãi A/C vui lòng nhắn vào đây giúp Bé Bơ ạ https://zalo.me/4018474138015540620 Hoặc gọi: 1900585878 - 0939785878. Giúp em nha!"
                     logging.warning(f"Web search failed: {search_result['answer']}")
             
             # Store the interaction in chat history

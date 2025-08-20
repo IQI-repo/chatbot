@@ -42,7 +42,7 @@ class ContextDetector:
             
             # Define the prompt for context detection
             system_prompt = """
-            Bạn là trợ lí ảo Bé Bơ, phụ trách phân loại câu hỏi của người dùng. Nhiệm vụ của bạn là xác định câu hỏi thuộc danh mục dịch vụ nào.
+            Bạn là nhân viên tư vấn Bé Bơ, phụ trách phân loại câu hỏi của người dùng. Nhiệm vụ của bạn là xác định câu hỏi thuộc danh mục dịch vụ nào.
             Phân tích câu hỏi và xác định nó thuộc vào một trong các ngữ cảnh sau:
             
             1. restaurant - Câu hỏi về đồ ăn, ăn uống, nhà hàng, thực đơn, món ăn, ẩm thực, v.v.
@@ -50,11 +50,12 @@ class ContextDetector:
             3. delivery - Câu hỏi về dịch vụ giao hàng, vận chuyển hàng hóa, đơn hàng, theo dõi giao hàng, v.v.
             4. transportation - Câu hỏi về di chuyển, đi lại, tài xế, phương tiện, v.v.
             5. tourism - Câu hỏi về điểm tham quan, thắng cảnh, tour du lịch, v.v.
-            6. general - Câu hỏi chung không thuộc các danh mục trên
+            6. order - Câu hỏi về lịch sử đặt hàng, đơn hàng đã đặt, dịch vụ đã sử dụng, v.v.
+            7. general - Câu hỏi chung không thuộc các danh mục trên
             
             Trả lời của bạn phải là một đối tượng JSON với cấu trúc sau:
             {
-                "primary_context": "[Danh mục chính - phải là một trong các giá trị: restaurant, accommodation, delivery, transportation, tourism, general]",
+                "primary_context": "[Danh mục chính - phải là một trong các giá trị: restaurant, accommodation, delivery, transportation, tourism, order, general]",
                 "confidence": [Một số từ 0 đến 1 chỉ mức độ tin cậy],
                 "all_contexts": {
                     "restaurant": [Điểm từ 0 đến 1],
@@ -62,6 +63,7 @@ class ContextDetector:
                     "delivery": [Điểm từ 0 đến 1],
                     "transportation": [Điểm từ 0 đến 1],
                     "tourism": [Điểm từ 0 đến 1],
+                    "order": [Điểm từ 0 đến 1],
                     "general": [Điểm từ 0 đến 1]
                 }
             }
@@ -115,8 +117,10 @@ class ContextDetector:
                 "all_contexts": {
                     "restaurant": 0.0,
                     "accommodation": 0.0,
+                    "delivery": 0.0,
                     "transportation": 0.0,
                     "tourism": 0.0,
+                    "order": 0.0,
                     "general": 1.0
                 },
                 "error": str(e)
@@ -137,7 +141,9 @@ if __name__ == "__main__":
         "Do you have any hotel recommendations?",
         "I need a driver to take me to the airport",
         "What are some interesting places to visit?",
-        "What's the weather like today?"
+        "What's the weather like today?",
+        "Kiểm tra lịch sử đơn hàng của tôi",
+        "Tôi đã từng đặt dịch vụ nào chưa?"
     ]
     
     # Test the detector
