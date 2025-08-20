@@ -14,7 +14,7 @@ def get_be_bo_system_prompt():
     """
     
     system_prompt = """
-    Bạn là Bé Bơ, một trợ lý thông minh và thân thiện của dịch vụ ShipperRachGia.vn.
+    Bạn là Bé Bơ, một nhân viên tư vấn thông minh và thân thiện của dịch vụ ShipperRachGia.vn.
     
     Hướng dẫn cách trả lời:
     1. QUAN TRỌNG NHẤT: Luôn trả lời hoàn toàn bằng tiếng Việt, không bao giờ sử dụng tiếng Anh hoặc bất kỳ ngôn ngữ nào khác, dù chỉ là một từ.
@@ -112,12 +112,30 @@ def get_be_bo_delivery_prompt():
     
     return delivery_prompt
 
+def get_be_bo_order_prompt():
+    """
+    Returns the specialized system prompt for order-related queries
+    """
+    system_prompt = get_be_bo_system_prompt()
+    order_prompt = system_prompt + """
+    
+    Đối với câu hỏi về lịch sử đơn hàng và dịch vụ đã sử dụng:
+    - Cung cấp thông tin chi tiết về các đơn hàng trước đây của người dùng, bao gồm loại dịch vụ, thời gian, trạng thái và chi tiết thanh toán nếu có.
+    - Khi người dùng hỏi về việc đã từng sử dụng dịch vụ nào, hãy liệt kê các loại dịch vụ họ đã sử dụng như nhà hàng, khách sạn, taxi, vé tàu, v.v.
+    - Nếu người dùng hỏi về một loại dịch vụ cụ thể, hãy cung cấp thông tin chi tiết về những lần họ đã sử dụng dịch vụ đó.
+    - Khi đề cập đến đơn hàng, hãy nêu rõ thông tin về trạng thái (đã hoàn thành, đang xử lý, đã hủy), phương thức thanh toán và tổng giá trị.
+    - Nếu người dùng chưa từng sử dụng dịch vụ nào, hãy thông báo rõ ràng và gợi ý các dịch vụ phù hợp họ có thể quan tâm.
+    - Khi người dùng hỏi về chi tiết đơn hàng cụ thể, hãy cung cấp thông tin đầy đủ về đơn hàng đó nếu có trong cơ sở dữ liệu.
+    """
+    
+    return order_prompt
+
 def get_system_prompt_by_context(context_type):
     """
     Returns the appropriate system prompt based on the detected context
     
     Args:
-        context_type: The type of context detected (restaurant, accommodation, delivery, general, etc.)
+        context_type: The type of context detected (restaurant, accommodation, delivery, order, general, etc.)
         
     Returns:
         The appropriate system prompt for the given context
@@ -128,5 +146,7 @@ def get_system_prompt_by_context(context_type):
         return get_be_bo_hotel_prompt()
     elif context_type == "delivery":
         return get_be_bo_delivery_prompt()
+    elif context_type == "order":
+        return get_be_bo_order_prompt()
     else:
         return get_be_bo_general_prompt()

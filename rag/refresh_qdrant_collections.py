@@ -47,6 +47,7 @@ EMBEDDING_SIZE = 1536  # OpenAI Ada embedding size
 # Collection names
 RESTAURANT_COLLECTION = "restaurant_collection"
 HOTEL_COLLECTION = "hotel_collection"
+ORDERS_COLLECTION = "orders_collection"
 
 def get_db_connection():
     """
@@ -60,66 +61,133 @@ def get_db_connection():
         logging.error(f"Database connection error: {err}")
         raise
 
-def get_qdrant_client():
+def get_qdrant_client(max_retries=3, timeout=30.0):
     """
-    Initialize and return a Qdrant client
+    Initialize and return a Qdrant client with retry logic
+    
+    Args:
+        max_retries: Maximum number of connection attempts
+        timeout: Connection timeout in seconds
     """
-    try:
-        if QDRANT_API_KEY:
-            client = QdrantClient(
-                api_key=QDRANT_API_KEY,
-                url=QDRANT_URL,
-                port=QDRANT_PORT
-            )
-            logging.info("Connected to Qdrant cloud service")
-        else:
-            client = QdrantClient(":memory:")  # In-memory storage for testing
-            logging.info("Using in-memory Qdrant instance (no API key provided)")
-        
-        return client
-    except Exception as e:
-        logging.error(f"Error initializing Qdrant client: {e}")
-        raise
+    retry_count = 0
+    last_exception = None
+    
+    while retry_count < max_retries:
+        try:
+            if QDRANT_API_KEY:
+                client = QdrantClient(
+                    api_key=QDRANT_API_KEY,
+                    url=QDRANT_URL,
+                    port=QDRANT_PORT,
+                    timeout=timeout
+                )
+                logging.info("Connected to Qdrant cloud service")
+            else:
+                client = QdrantClient(":memory:", timeout=timeout)  # In-memory storage for testing
+                logging.info("Using in-memory Qdrant instance (no API key provided)")
+            
+            # Test connection by getting collections list
+            try:
+                client.get_collections()
+                return client
+            except Exception as e:
+                logging.warning(f"Connection test failed: {e}")
+                raise e
+                
+        except Exception as e:
+            retry_count += 1
+            last_exception = e
+            wait_time = 2 ** retry_count  # Exponential backoff
+            logging.warning(f"Qdrant connection attempt {retry_count}/{max_retries} failed: {e}. Retrying in {wait_time} seconds...")
+            time.sleep(wait_time)
+    
+    # If we get here, all retries failed
+    logging.error(f"Failed to connect to Qdrant after {max_retries} attempts: {last_exception}")
+    
+    # Fall back to in-memory client if cloud connection fails
+    logging.warning("Falling back to in-memory Qdrant client")
+    return QdrantClient(":memory:", timeout=timeout)
 
-def create_collection(client, collection_name):
+def create_collection(client, collection_name, max_retries=3):
     """
-    Create a new collection in Qdrant
+    Create a new collection in Qdrant with retry logic
+    
+    Args:
+        client: Qdrant client instance
+        collection_name: Name of the collection to create
+        max_retries: Maximum number of creation attempts
     """
-    try:
-        logging.info(f"Creating collection '{collection_name}'")
-        client.create_collection(
-            collection_name=collection_name,
-            vectors_config=VectorParams(
-                size=EMBEDDING_SIZE,
-                distance=Distance.COSINE
-            ),
-            # Create payload indexes for faster filtering
-            optimizers_config=models.OptimizersConfigDiff(
-                indexing_threshold=0  # Index all vectors
+    retry_count = 0
+    last_exception = None
+    
+    while retry_count < max_retries:
+        try:
+            logging.info(f"Creating collection '{collection_name}' (attempt {retry_count + 1}/{max_retries})")
+            client.create_collection(
+                collection_name=collection_name,
+                vectors_config=VectorParams(
+                    size=EMBEDDING_SIZE,
+                    distance=Distance.COSINE
+                ),
+                # Create payload indexes for faster filtering
+                optimizers_config=models.OptimizersConfigDiff(
+                    indexing_threshold=0  # Index all vectors
+                )
             )
-        )
-        logging.info(f"Collection '{collection_name}' created successfully")
-    except Exception as e:
-        logging.error(f"Error creating collection '{collection_name}': {e}")
-        raise
+            logging.info(f"Collection '{collection_name}' created successfully")
+            return True
+        except Exception as e:
+            retry_count += 1
+            last_exception = e
+            wait_time = 2 ** retry_count  # Exponential backoff
+            logging.warning(f"Collection creation attempt {retry_count}/{max_retries} failed: {e}. Retrying in {wait_time} seconds...")
+            time.sleep(wait_time)
+    
+    # If we get here, all retries failed
+    logging.error(f"Failed to create collection '{collection_name}' after {max_retries} attempts: {last_exception}")
+    return False
 
-def delete_collection(client, collection_name):
+def delete_collection(client, collection_name, max_retries=3):
     """
-    Delete a collection from Qdrant if it exists
+    Delete a collection from Qdrant if it exists with retry logic
+    
+    Args:
+        client: Qdrant client instance
+        collection_name: Name of the collection to delete
+        max_retries: Maximum number of deletion attempts
     """
-    try:
-        collections = client.get_collections().collections
-        collection_names = [collection.name for collection in collections]
-        
-        if collection_name in collection_names:
-            logging.info(f"Deleting collection '{collection_name}'")
+    retry_count = 0
+    last_exception = None
+    
+    while retry_count < max_retries:
+        try:
+            # Check if collection exists
+            try:
+                collections = client.get_collections().collections
+                collection_names = [collection.name for collection in collections]
+                
+                if collection_name not in collection_names:
+                    logging.info(f"Collection '{collection_name}' does not exist, nothing to delete")
+                    return True
+            except Exception as e:
+                logging.warning(f"Error checking if collection exists: {e}")
+                # Continue with deletion attempt anyway
+            
+            logging.info(f"Deleting collection '{collection_name}' (attempt {retry_count + 1}/{max_retries})")
             client.delete_collection(collection_name=collection_name)
             logging.info(f"Collection '{collection_name}' deleted successfully")
-        else:
-            logging.info(f"Collection '{collection_name}' does not exist, nothing to delete")
-    except Exception as e:
-        logging.error(f"Error deleting collection '{collection_name}': {e}")
-        raise
+            return True
+            
+        except Exception as e:
+            retry_count += 1
+            last_exception = e
+            wait_time = 2 ** retry_count  # Exponential backoff
+            logging.warning(f"Collection deletion attempt {retry_count}/{max_retries} failed: {e}. Retrying in {wait_time} seconds...")
+            time.sleep(wait_time)
+    
+    # If we get here, all retries failed
+    logging.error(f"Failed to delete collection '{collection_name}' after {max_retries} attempts: {last_exception}")
+    return False
 
 def fetch_restaurant_data():
     """
@@ -209,6 +277,53 @@ def fetch_hotel_data():
         
     except mysql.connector.Error as err:
         logging.error(f"Error fetching hotel data: {err}")
+        return []
+    finally:
+        cursor.close()
+        conn.close()
+
+def fetch_orders_data():
+    """
+    Fetch orders data from MySQL database
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    try:
+        # Fetch orders
+        logging.info("Fetching orders from database...")
+        cursor.execute("""
+            SELECT o.*, u.name as user_name, u.phone as user_phone, u.email as user_email
+            FROM orders o
+            LEFT JOIN users u ON o.user_id = u.id
+            ORDER BY o.created_at DESC
+            LIMIT 1000
+        """)
+        orders = cursor.fetchall()
+        logging.info(f"Fetched {len(orders)} orders")
+        
+        # Process each order to get order details
+        for order in orders:
+            order_id = order['id']
+            
+            # Fetch order details for this order
+            cursor.execute("""
+                SELECT od.*, 
+                       COALESCE(i.name, hr.name, NULL) as item_name,
+                       COALESCE(r.name, h.name, NULL) as service_name
+                FROM orders od
+                LEFT JOIN items i ON od.item_id = i.id
+                LEFT JOIN restaurants r ON i.restaurant_id = r.id
+                LEFT JOIN hotel_rooms hr ON od.room_id = hr.id
+                LEFT JOIN hotels h ON hr.hotel_id = h.id
+                WHERE od.order_id = %s
+            """, (order_id,))
+            order['details'] = cursor.fetchall()
+            
+        return orders
+        
+    except mysql.connector.Error as err:
+        logging.error(f"Error fetching orders data: {err}")
         return []
     finally:
         cursor.close()
@@ -314,6 +429,56 @@ def create_hotel_text_representations(hotels):
     
     return hotel_texts
 
+def create_orders_text_representations(orders):
+    """
+    Create text representations for orders to generate embeddings
+    """
+    order_texts = []
+    
+    for order in orders:
+        # Basic order info
+        order_text = f"Order ID: {order.get('id')}\n"
+        order_text += f"User ID: {order.get('user_id', 'Unknown')}\n"
+        if order.get('user_name'):
+            order_text += f"User Name: {order.get('user_name')}\n"
+        if order.get('user_phone'):
+            order_text += f"User Phone: {order.get('user_phone')}\n"
+        if order.get('user_email'):
+            order_text += f"User Email: {order.get('user_email')}\n"
+            
+        order_text += f"Service Type: {order.get('service_type', 'Unknown')}\n"
+        order_text += f"Status: {order.get('status', 'Unknown')}\n"
+        order_text += f"Total Amount: {order.get('total_amount', 0)} VND\n"
+        order_text += f"Payment Method: {order.get('payment_method', 'Unknown')}\n"
+        
+        if order.get('created_at'):
+            order_text += f"Created At: {order.get('created_at')}\n"
+        
+        if order.get('address'):
+            order_text += f"Address: {order.get('address')}\n"
+        
+        if order.get('note'):
+            order_text += f"Note: {order.get('note')}\n"
+        
+        # Order details
+        if order.get('details'):
+            order_text += "Order Details:\n"
+            for detail in order.get('details', []):
+                if detail.get('item_name'):
+                    order_text += f"- {detail.get('item_name')}\n"
+                    order_text += f"  Quantity: {detail.get('quantity', 1)}\n"
+                    order_text += f"  Price: {detail.get('price', 0)} VND\n"
+                    
+                if detail.get('service_name'):
+                    order_text += f"  Service: {detail.get('service_name')}\n"
+                
+                if detail.get('note'):
+                    order_text += f"  Note: {detail.get('note')}\n"
+        
+        order_texts.append(order_text)
+    
+    return order_texts
+
 def ingest_data_to_qdrant(client, collection_name, data, embeddings):
     """
     Ingest data and embeddings into Qdrant
@@ -352,7 +517,7 @@ def ingest_data_to_qdrant(client, collection_name, data, embeddings):
                     'address': item.get('address', ''),
                     'items': menu_items
                 }
-            else:  # HOTEL_COLLECTION
+            elif collection_name == HOTEL_COLLECTION:
                 # Extract rooms for payload
                 rooms = []
                 for room in item.get('rooms', []):
@@ -380,6 +545,29 @@ def ingest_data_to_qdrant(client, collection_name, data, embeddings):
                     'longitude': item.get('longitude'),
                     'rooms': rooms,
                     'amenities': amenities
+                }
+            else:  # ORDERS_COLLECTION
+                # Extract order details for payload
+                details = []
+                for detail in item.get('details', []):
+                    if detail is not None:
+                        details.append({
+                            'item_name': detail.get('item_name', ''),
+                            'service_name': detail.get('service_name', ''),
+                            'quantity': detail.get('quantity', 1),
+                            'price': detail.get('price', 0)
+                        })
+                
+                payload = {
+                    'id': item_id,
+                    'user_id': item.get('user_id', ''),
+                    'user_name': item.get('user_name', ''),
+                    'service_type': item.get('service_type', ''),
+                    'status': item.get('status', ''),
+                    'total_amount': item.get('total_amount', 0),
+                    'payment_method': item.get('payment_method', ''),
+                    'created_at': str(item.get('created_at', '')),
+                    'details': details
                 }
             
             # Create point structure
@@ -411,41 +599,48 @@ def refresh_restaurant_collection():
     """
     logging.info("Starting restaurant collection refresh...")
     
-    # Initialize Qdrant client
-    client = get_qdrant_client()
-    
-    # Delete existing collection
-    delete_collection(client, RESTAURANT_COLLECTION)
-    
-    # Create new collection
-    create_collection(client, RESTAURANT_COLLECTION)
-    
-    # Fetch restaurant data
-    restaurants = fetch_restaurant_data()
-    if not restaurants:
-        logging.error("No restaurant data fetched, aborting refresh")
+    try:
+        # Initialize Qdrant client
+        client = get_qdrant_client()
+        
+        # Delete existing collection
+        if not delete_collection(client, RESTAURANT_COLLECTION):
+            logging.warning("Failed to delete restaurant collection, but will try to continue")
+        
+        # Create new collection
+        if not create_collection(client, RESTAURANT_COLLECTION):
+            logging.error("Failed to create restaurant collection, aborting refresh")
+            return False
+        
+        # Fetch restaurant data
+        restaurants = fetch_restaurant_data()
+        if not restaurants:
+            logging.error("No restaurant data fetched, aborting refresh")
+            return False
+        
+        # Create text representations
+        restaurant_texts = create_restaurant_text_representations(restaurants)
+        
+        # Initialize embeddings manager
+        openai_api_key = os.getenv('OPENAI_API_KEY')
+        if not openai_api_key:
+            logging.error("OPENAI_API_KEY not found in environment variables")
+            return False
+        
+        embeddings_manager = EmbeddingsManager(openai_api_key)
+        
+        # Generate embeddings
+        logging.info("Generating embeddings for restaurants...")
+        restaurant_embeddings = embeddings_manager.create_embeddings(restaurant_texts)
+        logging.info(f"Generated {len(restaurant_embeddings)} restaurant embeddings")
+        
+        # Ingest data into Qdrant
+        success = ingest_data_to_qdrant(client, RESTAURANT_COLLECTION, restaurants, restaurant_embeddings)
+        
+        return success
+    except Exception as e:
+        logging.error(f"Unexpected error in restaurant collection refresh: {e}")
         return False
-    
-    # Create text representations
-    restaurant_texts = create_restaurant_text_representations(restaurants)
-    
-    # Initialize embeddings manager
-    openai_api_key = os.getenv('OPENAI_API_KEY')
-    if not openai_api_key:
-        logging.error("OPENAI_API_KEY not found in environment variables")
-        return False
-    
-    embeddings_manager = EmbeddingsManager(openai_api_key)
-    
-    # Generate embeddings
-    logging.info("Generating embeddings for restaurants...")
-    restaurant_embeddings = embeddings_manager.create_embeddings(restaurant_texts)
-    logging.info(f"Generated {len(restaurant_embeddings)} restaurant embeddings")
-    
-    # Ingest data into Qdrant
-    success = ingest_data_to_qdrant(client, RESTAURANT_COLLECTION, restaurants, restaurant_embeddings)
-    
-    return success
 
 def refresh_hotel_collection():
     """
@@ -489,6 +684,59 @@ def refresh_hotel_collection():
     
     return success
 
+def refresh_orders_collection():
+    """
+    Refresh the orders collection in Qdrant
+    """
+    logging.info("Starting orders collection refresh...")
+    
+    # Initialize Qdrant client
+    client = get_qdrant_client()
+    
+    # Delete existing collection
+    delete_collection(client, ORDERS_COLLECTION)
+    
+    # Create new collection
+    create_collection(client, ORDERS_COLLECTION)
+    
+    # Fetch orders data
+    orders = fetch_orders_data()
+    if not orders:
+        logging.error("No orders data fetched, aborting refresh")
+        return False
+    
+    # Create text representations
+    order_texts = create_orders_text_representations(orders)
+    
+    # Initialize embeddings manager
+    openai_api_key = os.getenv('OPENAI_API_KEY')
+    if not openai_api_key:
+        logging.error("OPENAI_API_KEY not found in environment variables")
+        return False
+    
+    embeddings_manager = EmbeddingsManager(openai_api_key)
+    
+    # Generate embeddings
+    logging.info("Generating embeddings for orders...")
+    embeddings = []
+    batch_size = 10  # Process in smaller batches to avoid timeouts
+    
+    for i in range(0, len(order_texts), batch_size):
+        batch_texts = order_texts[i:i+batch_size]
+        batch_embeddings = embeddings_manager.create_embeddings(batch_texts)
+        embeddings.extend(batch_embeddings)
+        logging.info(f"Generated embeddings for batch {i//batch_size + 1}/{(len(order_texts) + batch_size - 1)//batch_size}")
+    
+    # Ingest data to Qdrant
+    success = ingest_data_to_qdrant(client, ORDERS_COLLECTION, orders, embeddings)
+    
+    if success:
+        logging.info("Orders collection refreshed successfully")
+    else:
+        logging.error("Failed to refresh orders collection")
+    
+    return success
+
 def main():
     """
     Main function to refresh all Qdrant collections
@@ -510,16 +758,23 @@ def main():
     else:
         logging.error("Hotel collection refresh failed")
     
+    # Refresh orders collection
+    orders_success = refresh_orders_collection()
+    if orders_success:
+        logging.info("Orders collection refresh completed successfully")
+    else:
+        logging.error("Orders collection refresh failed")
+    
     # Log overall status
     end_time = time.time()
     duration = end_time - start_time
     logging.info(f"Qdrant collections refresh completed in {duration:.2f} seconds")
     
-    if restaurant_success and hotel_success:
+    if restaurant_success and hotel_success and orders_success:
         logging.info("All collections refreshed successfully")
         return 0
     else:
-        logging.error("Some collection refreshes failed")
+        logging.warning("Some collections failed to refresh")
         return 1
 
 if __name__ == "__main__":
